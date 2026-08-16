@@ -14,6 +14,14 @@ class GeniusException(ProviderException):
     """Raised when the Genius provider fails."""
 
 
+class GeniusApiException(GeniusException):
+    """Raised when the Genius API request fails."""
+
+
+class GeniusResponseException(GeniusException):
+    """Raised when the Genius API returns an unexpected response."""
+    
+
 class GoogleSearchException(ProviderException):
     """Raised when Google Search fails."""
 

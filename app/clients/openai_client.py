@@ -11,9 +11,6 @@ from app.prompts.identify_song import IDENTIFY_SONG_PROMPT
 
 
 class OpenAIClient:
-    """
-    Client responsible for communicating with the OpenAI API.
-    """
 
     def __init__(self) -> None:
         settings = get_settings()
@@ -25,9 +22,6 @@ class OpenAIClient:
         )
 
     async def identify_song(self, lyric: str) -> Song:
-        """
-        Identifies a song from a lyric snippet using OpenAI.
-        """
 
         try:
             response = await self._client.responses.create(
