@@ -1,80 +1,61 @@
+
 from app.core.exceptions import LyricNotFoundException
+from app.services.lyric_line_classifier import LyricLineClassifier
+from app.services.lyric_matcher import LyricMatcher
 
 
 class NextLineService:
     """
-    Finds the continuation of a user's lyric input
-    within the full song lyrics.
+    Finds the next meaningful lyric line after
+    the user's lyric.
     """
+
+    def __init__(
+        self,
+        lyric_matcher: LyricMatcher,
+        lyric_line_classifier: LyricLineClassifier,
+    ):
+        self._lyric_matcher = lyric_matcher
+        self._lyric_line_classifier = lyric_line_classifier
 
     def find_next_line(
         self,
-        lyrics: str,
+        lyrics: list[str],
         user_lyric: str,
     ) -> str:
-        if not lyrics or not lyrics.strip():
-            raise LyricNotFoundException(
-                "Song lyrics are empty."
-            )
 
-        if not user_lyric or not user_lyric.strip():
-            raise LyricNotFoundException(
-                "Lyric input is empty."
-            )
-
-        lines = self._split_lines(lyrics)
-        user_input = self._normalize_for_matching(user_lyric)
-
-        for index, line in enumerate(lines):
-            normalized_line = self._normalize_for_matching(line)
-
-            if user_input == normalized_line:
-                return self._get_next_line(lines, index)
-
-            if normalized_line.startswith(user_input + " "):
-                remainder = line[len(user_lyric.strip()):].strip()
-
-                return self._build_partial_continuation(
-                    remainder=remainder,
-                    next_line=self._get_next_line(lines, index),
-                )
-
-        raise LyricNotFoundException(
-            "Unable to find the provided lyric in the song."
+        match_end = self._lyric_matcher.find_match_end(
+            lyrics=lyrics,
+            user_lyric=user_lyric,
         )
 
-    @staticmethod
-    def _split_lines(lyrics: str) -> list[str]:
-        return [
-            line.strip()
-            for line in lyrics.splitlines()
-            if line.strip()
-        ]
-
-    @staticmethod
-    def _normalize_for_matching(value: str) -> str:
-        return " ".join(value.lower().split())
-
-    @staticmethod
-    def _get_next_line(
-        lines: list[str],
-        index: int,
-    ) -> str:
-        next_index = index + 1
-
-        if next_index >= len(lines):
+        if match_end is None:
             raise LyricNotFoundException(
-                "There is no next line for the provided lyric."
+                "Unable to find the provided lyric "
+                "in the song."
             )
 
-        return lines[next_index]
+        for index in range(
+            match_end + 1,
+            len(lyrics),
+        ):
+            line = lyrics[index].strip()
 
-    @staticmethod
-    def _build_partial_continuation(
-        remainder: str,
-        next_line: str,
-    ) -> str:
-        if not remainder:
-            return next_line
+            if not line:
+                continue
 
-        return f"...{remainder}\n\n{next_line}"
+            if self._lyric_line_classifier.is_vocal_only(
+                line
+            ):
+                continue
+
+            # IMPORTANT:
+            # Return the ORIGINAL Genius line.
+            #
+            # Do not return a normalized version.
+            return line
+
+        raise LyricNotFoundException(
+            "No continuation found after the "
+            "provided lyric."
+        )

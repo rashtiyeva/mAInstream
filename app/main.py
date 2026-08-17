@@ -1,6 +1,10 @@
 from fastapi import FastAPI
 
 from app.api.lyrics_controller import router as lyrics_router
+from app.core.logging_config import configure_logging
+
+configure_logging()
+
 
 app = FastAPI(
     title="Mainstream",

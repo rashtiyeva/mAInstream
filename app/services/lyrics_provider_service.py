@@ -5,14 +5,14 @@ from app.providers.genius_provider import GeniusProvider
 
 
 class LyricsProviderService:
+    """
+    Service responsible for finding a song source.
+    """
 
     def __init__(self, genius_provider: GeniusProvider) -> None:
         self._genius_provider = genius_provider
 
-    async def find_song_source(
-        self,
-        song: Song,
-    ) -> SongSource:
+    async def find_song_source(self, song: Song) -> SongSource:
         source = await self._genius_provider.find_song(song)
 
         if source is None:

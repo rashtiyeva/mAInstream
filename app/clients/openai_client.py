@@ -38,12 +38,18 @@ class OpenAIClient:
                 ],
             )
 
+            print("OPENAI RAW RESPONSE:", response.output_text)
+
             if not response.output_text:
                 raise InvalidProviderResponseException(
                     "OpenAI returned an empty response."
                 )
 
-            return Song.model_validate_json(response.output_text)
+            song = Song.model_validate_json(response.output_text)
+
+            print("PARSED SONG:", song)
+
+            return song
 
         except ValidationError as ex:
             raise InvalidProviderResponseException(

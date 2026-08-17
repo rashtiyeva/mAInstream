@@ -3,8 +3,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.dependencies.services import get_lyrics_orchestrator
+from app.models.dto.lyric_continuation_response import (
+    LyricContinuationResponse,
+)
 from app.models.dto.request import LyricContinuationRequest
-from app.models.dto.response import LyricContinuationResponse
 from app.services.lyrics_orchestrator import LyricsOrchestrator
 
 router = APIRouter(prefix="/lyrics", tags=["Lyrics"])
