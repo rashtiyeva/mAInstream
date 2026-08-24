@@ -1,6 +1,9 @@
 import pytest
 
-from app.core.exceptions import LyricNotFoundException
+from app.core.exceptions import (
+    ContinuationNotFoundException,
+    LyricNotFoundException,
+)
 from app.services.next_line_service import NextLineService
 
 
@@ -13,7 +16,7 @@ def service() -> NextLineService:
 def lyrics() -> str:
     return (
         "In another life\n"
-        "I will be your girl\n"
+        "I would be your girl\n"
         "We keep all our promises\n"
         "Be us against the world"
     )
@@ -24,15 +27,19 @@ def lyrics() -> str:
     [
         (
             "In another life",
-            "I will be your girl",
+            "I would be your girl",
         ),
         (
             "IN ANOTHER LIFE",
-            "I will be your girl",
+            "I would be your girl",
+        ),
+        (
+            "In AnoTher Life",
+            "I would be your girl",
         ),
         (
             "In   another   life",
-            "I will be your girl",
+            "I would be your girl",
         ),
     ],
 )
@@ -59,7 +66,69 @@ def test_find_next_line_returns_remaining_text_and_next_line_for_partial_lyric(
         user_lyric="In another",
     )
 
-    assert result == "...life\n\nI will be your girl"
+    assert result == "life...\n\nI would be your girl"
+
+
+def test_partial_match_returns_line_remainder_and_next_line(
+    service: NextLineService,
+) -> None:
+    lyrics = (
+        "'Cause the players gonna play, play, play, play, play\n"
+        "And the haters gonna hate, hate, hate, hate, hate"
+    )
+
+    result = service.find_next_line(
+        lyrics=lyrics,
+        user_lyric="the players gonna play",
+    )
+
+    assert result == (
+        "play, play, play, play...\n\n"
+        "And the haters gonna hate, hate, hate, hate, hate"
+    )
+
+
+def test_aggressive_partial_match_preserves_original_remainder(
+    service: NextLineService,
+) -> None:
+    lyrics = (
+        "I remember it all too well\n"
+        "Wind in my hair, I was there"
+    )
+
+    result = service.find_next_line(
+        lyrics=lyrics,
+        user_lyric="'I remember it all too",
+    )
+
+    assert result == "well...\n\nWind in my hair, I was there"
+
+
+@pytest.mark.parametrize(
+    "user_input",
+    [
+        "Shake It Off",
+        "shake it off",
+        "SHAKE IT OFF",
+    ],
+)
+def test_song_title_returns_first_lyric_line(
+    service: NextLineService,
+    user_input: str,
+) -> None:
+    lyrics = (
+        "I stay out too late\n"
+        "Got nothin' in my brain\n"
+        "I shake it off, I shake it off"
+    )
+
+    result = service.find_next_line(
+        lyrics=lyrics,
+        user_lyric=user_input,
+        song_title="Shake It Off",
+    )
+
+    assert result == "I stay out too late"
 
 
 def test_find_next_line_raises_when_lyric_is_not_found(
@@ -128,7 +197,7 @@ def test_find_next_line_raises_when_complete_lyric_is_last_line(
     )
 
     with pytest.raises(
-        LyricNotFoundException,
+        ContinuationNotFoundException,
         match="There is no next line for the provided lyric.",
     ):
         service.find_next_line(

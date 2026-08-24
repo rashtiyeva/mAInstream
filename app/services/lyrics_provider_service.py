@@ -1,4 +1,4 @@
-from app.core.exceptions import SongNotFoundException
+from app.core.exceptions import LyricsNotFoundException
 from app.models.domain.song import Song
 from app.models.domain.song_source import SongSource
 from app.providers.genius_provider import GeniusProvider
@@ -16,7 +16,7 @@ class LyricsProviderService:
         source = await self._genius_provider.find_song(song)
 
         if source is None:
-            raise SongNotFoundException(
+            raise LyricsNotFoundException(
                 "Unable to find the song on Genius."
             )
 

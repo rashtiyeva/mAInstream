@@ -3,3 +3,5 @@ DEFAULT_LANGUAGE = "en"
 USER_AGENT = "mainstream"
 
 MAX_RETRIES = 3
+
+MIN_LYRIC_WORDS = 3

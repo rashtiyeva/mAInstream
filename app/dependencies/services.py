@@ -11,6 +11,7 @@ from app.dependencies.clients import (
 from app.parsers.genius_lyrics_parser import GeniusLyricsParser
 from app.providers.genius_provider import GeniusProvider
 from app.services.lyric_line_classifier import LyricLineClassifier
+from app.services.lyric_input_validator import LyricInputValidator
 from app.services.lyric_matcher import LyricMatcher
 from app.services.lyrics_orchestrator import LyricsOrchestrator
 from app.services.lyrics_provider_service import LyricsProviderService
@@ -51,6 +52,10 @@ def get_lyrics_parser() -> GeniusLyricsParser:
 
 def get_lyric_matcher() -> LyricMatcher:
     return LyricMatcher()
+
+
+def get_lyric_input_validator() -> LyricInputValidator:
+    return LyricInputValidator()
 
 
 def get_lyric_line_classifier() -> LyricLineClassifier:
@@ -94,6 +99,10 @@ def get_lyrics_orchestrator(
         NextLineService,
         Depends(get_next_line_service),
     ],
+    lyric_input_validator: Annotated[
+        LyricInputValidator,
+        Depends(get_lyric_input_validator),
+    ],
 ) -> LyricsOrchestrator:
     return LyricsOrchestrator(
         song_identifier_service=song_identifier_service,
@@ -101,4 +110,5 @@ def get_lyrics_orchestrator(
         genius_client=genius_client,
         lyrics_parser=lyrics_parser,
         next_line_service=next_line_service,
+        lyric_input_validator=lyric_input_validator,
     )

@@ -1,19 +1,26 @@
-
+import logging
 import re
+
+from app.services.lyric_normalizer import LyricNormalizer
+
+
+logger = logging.getLogger(__name__)
 
 
 class LyricMatcher:
     """
-    Finds the position of user-provided lyrics inside song lyrics.
+    Finds the position of user-provided lyrics
+    inside parsed song lyrics.
 
     Matching priority:
 
     1. Exact match.
     2. Normalized match.
-    3. Punctuation-agnostic match.
+    3. Normalized partial-line match at word boundaries.
+    4. Aggressively normalized partial-line match at word boundaries.
 
-    AI matching is intentionally not handled here.
-    It will be added later as a fallback.
+    More tolerant matching strategies will be
+    added later as fallbacks.
 
     The original lyrics are never modified.
     """
@@ -23,46 +30,103 @@ class LyricMatcher:
         lyrics: list[str],
         user_lyric: str,
     ) -> int | None:
-        if not lyrics or not user_lyric.strip():
-            return None
-
-        user_lines = self._prepare_user_lines(user_lyric)
-
-        if not user_lines:
-            return None
-
-        # ---------------------------------------------------------
-        # 1. Exact match
-        # ---------------------------------------------------------
-
-        match = self._find_exact_match(
-            lyrics=lyrics,
-            user_lyric=user_lyric,
+        logger.debug(
+            "LYRIC MATCH | started | song_lines=%d | user_input=%r",
+            len(lyrics),
+            user_lyric,
         )
 
-        if match is not None:
-            return match
+        if not lyrics or not user_lyric.strip():
+            logger.info(
+                "LYRIC MATCH | found=false | reason=empty_input_or_lyrics"
+            )
+            return None
 
-        # ---------------------------------------------------------
-        # 2. Normalized match
-        # ---------------------------------------------------------
+        user_lines = self._prepare_original_user_lines(
+            user_lyric
+        )
 
-        match = self._find_normalized_match(
+        if not user_lines:
+            logger.info(
+                "LYRIC MATCH | found=false | reason=no_user_lines"
+            )
+            return None
+
+        logger.debug("LYRIC MATCH | prepared_user_lines=%r", user_lines)
+        normalized_user_lines = [
+            LyricNormalizer.normalize_user_lyric(line)
+            for line in user_lines
+        ]
+
+        match = self._find_exact_match(
             lyrics=lyrics,
             user_lines=user_lines,
         )
 
         if match is not None:
+            logger.info(
+                "LYRIC MATCH | found=true | strategy=exact | "
+                "start_index=%d | matched_lines=%d",
+                match,
+                len(user_lines),
+            )
             return match
 
-        # ---------------------------------------------------------
-        # 3. Punctuation-agnostic match
-        # ---------------------------------------------------------
+        logger.debug("LYRIC MATCH | exact match not found")
 
-        return self._find_punctuation_agnostic_match(
+        normalized_match = self._find_normalized_match(
             lyrics=lyrics,
-            user_lyric=user_lyric,
+            normalized_user_lines=normalized_user_lines,
         )
+
+        if normalized_match is None:
+            logger.debug("LYRIC MATCH | normalized whole-line match not found")
+        else:
+            logger.info(
+                "LYRIC MATCH | found=true | strategy=normalized | "
+                "start_index=%d | matched_lines=%d",
+                normalized_match,
+                len(user_lines),
+            )
+            return normalized_match
+
+        partial_match = self._find_normalized_partial_match(
+            lyrics=lyrics,
+            normalized_user_lines=normalized_user_lines,
+        )
+
+        if partial_match is not None:
+            logger.info(
+                "LYRIC MATCH | found=true | strategy=normalized_partial | "
+                "start_index=%d | matched_lines=%d",
+                partial_match,
+                len(user_lines),
+            )
+            return partial_match
+
+        aggressive_partial_match = (
+            self._find_aggressive_normalized_partial_match(
+                lyrics=lyrics,
+                user_lines=user_lines,
+            )
+        )
+
+        if aggressive_partial_match is not None:
+            logger.info(
+                "LYRIC MATCH | found=true | "
+                "strategy=aggressive_normalized_partial | "
+                "start_index=%d | matched_lines=%d",
+                aggressive_partial_match,
+                len(user_lines),
+            )
+            return aggressive_partial_match
+
+        logger.info(
+            "LYRIC MATCH | found=false | "
+            "strategies=exact,normalized,normalized_partial,"
+            "aggressive_normalized_partial"
+        )
+        return None
 
     def find_match_end(
         self,
@@ -77,31 +141,21 @@ class LyricMatcher:
         if start_index is None:
             return None
 
-        user_lines = self._prepare_user_lines(
+        user_lines = self._prepare_original_user_lines(
             user_lyric
         )
 
         return start_index + len(user_lines) - 1
 
-    # =============================================================
-    # EXACT MATCHING
-    # =============================================================
+    # =========================================================
+    # EXACT MATCH
+    # =========================================================
 
+    @staticmethod
     def _find_exact_match(
-        self,
         lyrics: list[str],
-        user_lyric: str,
+        user_lines: list[str],
     ) -> int | None:
-        user_lines = [
-            line.strip()
-            for line in user_lyric.splitlines()
-            if line.strip()
-        ]
-
-        if not user_lines:
-            return None
-
-        # Single-line input.
         if len(user_lines) == 1:
             user_line = user_lines[0]
 
@@ -111,7 +165,6 @@ class LyricMatcher:
 
             return None
 
-        # Multi-line input.
         for start in range(
             len(lyrics) - len(user_lines) + 1
         ):
@@ -127,23 +180,28 @@ class LyricMatcher:
 
         return None
 
-    # =============================================================
-    # NORMALIZED MATCHING
-    # =============================================================
+    # =========================================================
+    # NORMALIZED MATCH
+    # =========================================================
 
+    @staticmethod
     def _find_normalized_match(
-        self,
         lyrics: list[str],
-        user_lines: list[str],
+        normalized_user_lines: list[str],
     ) -> int | None:
-        normalized_lyrics = [
-            self._normalize(line)
-            for line in lyrics
-        ]
+        normalized_lyrics = (
+            LyricNormalizer.normalize_lines(
+                lyrics
+            )
+        )
 
-        # Single-line input.
-        if len(user_lines) == 1:
-            user_line = user_lines[0]
+        logger.debug(
+            "LYRIC MATCH | normalized_user_lines=%r",
+            normalized_user_lines,
+        )
+
+        if len(normalized_user_lines) == 1:
+            user_line = normalized_user_lines[0]
 
             for index, lyric in enumerate(
                 normalized_lyrics
@@ -153,261 +211,208 @@ class LyricMatcher:
 
             return None
 
-        # Multi-line input.
         for start in range(
-            len(normalized_lyrics) - len(user_lines) + 1
+            len(normalized_lyrics)
+            - len(normalized_user_lines)
+            + 1
         ):
             candidate = normalized_lyrics[
-                start:start + len(user_lines)
+                start:start + len(
+                    normalized_user_lines
+                )
             ]
 
-            if candidate == user_lines:
+            if candidate == normalized_user_lines:
                 return start
 
         return None
 
-    # =============================================================
-    # PUNCTUATION-AGNOSTIC MATCHING
-    # =============================================================
+    # =========================================================
+    # NORMALIZED PARTIAL MATCH
+    # =========================================================
 
-    def _find_punctuation_agnostic_match(
-        self,
+    @staticmethod
+    def _find_normalized_partial_match(
         lyrics: list[str],
-        user_lyric: str,
+        normalized_user_lines: list[str],
     ) -> int | None:
-        user_lines = [
-            line
-            for line in user_lyric.splitlines()
-            if line.strip()
+        """Find user fragments bounded by complete words in lyric lines."""
+
+        normalized_lyrics = LyricNormalizer.normalize_lines(lyrics)
+
+        if not normalized_user_lines:
+            return None
+
+        patterns = [
+            LyricMatcher._compile_partial_pattern(user_line)
+            for user_line in normalized_user_lines
+            if user_line
         ]
 
-        if not user_lines:
+        if len(patterns) != len(normalized_user_lines):
             return None
 
-        # ---------------------------------------------------------
-        # Single-line input
-        # ---------------------------------------------------------
+        for start in range(
+            len(normalized_lyrics) - len(patterns) + 1
+        ):
+            candidate = normalized_lyrics[
+                start:start + len(patterns)
+            ]
 
-        if len(user_lines) == 1:
-            user_variants = self._punctuation_agnostic_variants(
-                user_lines[0]
+            if all(
+                pattern.search(line)
+                for pattern, line in zip(patterns, candidate)
+            ):
+                return start
+
+        return None
+
+    @classmethod
+    def find_normalized_partial_remainder(
+        cls,
+        lyric_line: str,
+        user_line: str,
+    ) -> str | None:
+        """Return the untouched text following a boundary-safe partial match."""
+
+        normalized_lyric = LyricNormalizer.normalize(lyric_line)
+        normalized_user = LyricNormalizer.normalize(user_line)
+
+        if not normalized_lyric or not normalized_user:
+            return None
+
+        match = cls._compile_partial_pattern(normalized_user).search(
+            normalized_lyric
+        )
+
+        if match is None:
+            return None
+
+        original_end = cls._map_normalized_end_to_original(
+            original=lyric_line,
+            normalized_end=match.end(),
+            aggressive=False,
+        )
+
+        # Separating punctuation belongs to the matched fragment, not to the
+        # continuation. Punctuation inside the remaining lyric is preserved.
+        return re.sub(
+            r"^[\s,;:.!?…\-–—]+",
+            "",
+            lyric_line[original_end:],
+        ).strip()
+
+    @classmethod
+    def find_partial_remainder(
+        cls,
+        lyric_line: str,
+        user_line: str,
+    ) -> str | None:
+        """Return a remainder for normal or aggressive partial matching."""
+
+        normal_remainder = cls.find_normalized_partial_remainder(
+            lyric_line=lyric_line,
+            user_line=user_line,
+        )
+
+        if normal_remainder is not None:
+            return normal_remainder
+
+        aggressive_lyric = LyricNormalizer.aggressive(lyric_line)
+        aggressive_user = LyricNormalizer.aggressive(user_line)
+
+        if not aggressive_lyric or not aggressive_user:
+            return None
+
+        match = cls._compile_partial_pattern(aggressive_user).search(
+            aggressive_lyric
+        )
+
+        if match is None:
+            return None
+
+        original_end = cls._map_normalized_end_to_original(
+            original=lyric_line,
+            normalized_end=match.end(),
+            aggressive=True,
+        )
+
+        return re.sub(
+            r"^[\s,;:.!?…\-–—]+",
+            "",
+            lyric_line[original_end:],
+        ).strip()
+
+    @staticmethod
+    def _compile_partial_pattern(normalized_user_line: str) -> re.Pattern[str]:
+        return re.compile(
+            rf"(?<!\w){re.escape(normalized_user_line)}(?!\w)"
+        )
+
+    @staticmethod
+    def _map_normalized_end_to_original(
+        original: str,
+        normalized_end: int,
+        aggressive: bool,
+    ) -> int:
+        """Map a normalized end offset back to the original lyric line."""
+
+        for original_end in range(1, len(original) + 1):
+            normalizer = (
+                LyricNormalizer.aggressive
+                if aggressive
+                else LyricNormalizer.normalize
             )
+            normalized_prefix = normalizer(original[:original_end])
 
-            for index, lyric in enumerate(lyrics):
-                lyric_variants = (
-                    self._punctuation_agnostic_variants(lyric)
-                )
+            if len(normalized_prefix) >= normalized_end:
+                return original_end
 
-                if user_variants.intersection(
-                    lyric_variants
-                ):
-                    return index
+        return len(original)
 
+    @staticmethod
+    def _find_aggressive_normalized_partial_match(
+        lyrics: list[str],
+        user_lines: list[str],
+    ) -> int | None:
+        aggressive_lyrics = LyricNormalizer.aggressive_lines(lyrics)
+        aggressive_user_lines = LyricNormalizer.aggressive_lines(user_lines)
+
+        if not aggressive_user_lines or any(
+            not line for line in aggressive_user_lines
+        ):
             return None
 
-        # ---------------------------------------------------------
-        # Multi-line input
-        # ---------------------------------------------------------
-
-        user_variants_per_line = [
-            self._punctuation_agnostic_variants(line)
-            for line in user_lines
+        patterns = [
+            LyricMatcher._compile_partial_pattern(line)
+            for line in aggressive_user_lines
         ]
 
         for start in range(
-            len(lyrics) - len(user_lines) + 1
+            len(aggressive_lyrics) - len(patterns) + 1
         ):
-            candidate_lyrics = lyrics[
-                start:start + len(user_lines)
+            candidate = aggressive_lyrics[
+                start:start + len(patterns)
             ]
 
-            if self._multi_line_variants_match(
-                candidate_lyrics,
-                user_variants_per_line,
+            if all(
+                pattern.search(line)
+                for pattern, line in zip(patterns, candidate)
             ):
                 return start
 
         return None
 
-    def _multi_line_variants_match(
-        self,
-        lyrics: list[str],
-        user_variants_per_line: list[set[str]],
-    ) -> bool:
-        for lyric, user_variants in zip(
-            lyrics,
-            user_variants_per_line,
-        ):
-            lyric_variants = (
-                self._punctuation_agnostic_variants(lyric)
-            )
-
-            if not user_variants.intersection(
-                lyric_variants
-            ):
-                return False
-
-        return True
-
-    # =============================================================
-    # PUNCTUATION-AGNOSTIC VARIANTS
-    # =============================================================
-
-    @classmethod
-    def _punctuation_agnostic_variants(
-        cls,
-        text: str,
-    ) -> set[str]:
-        """
-        Returns punctuation-agnostic representations.
-
-        Apostrophes are treated specially.
-
-        Examples:
-
-            "It's the climb"
-                ->
-            {
-                "its the climb",
-                "it s the climb",
-            }
-
-            "Its the climb"
-                ->
-            {
-                "its the climb",
-            }
-
-            "It s the climb"
-                ->
-            {
-                "it s the climb",
-            }
-
-        Other punctuation is converted to whitespace.
-        """
-
-        text = cls._normalize(text)
-
-        if not text:
-            return set()
-
-        # Variant 1:
-        # Remove apostrophes completely.
-        #
-        # "it's" -> "its"
-        without_apostrophe = text.replace("'", "")
-
-        without_apostrophe = re.sub(
-            r"[^\w\s]",
-            " ",
-            without_apostrophe,
-        )
-
-        without_apostrophe = re.sub(
-            r"\s+",
-            " ",
-            without_apostrophe,
-        ).strip()
-
-        variants = {
-            without_apostrophe,
-        }
-
-        # Variant 2:
-        # Treat apostrophe as a word separator.
-        #
-        # "it's" -> "it s"
-        #
-        # We do this separately because the user may type
-        # "it s" instead of "it's".
-        with_apostrophe_as_separator = re.sub(
-            r"'",
-            " ",
-            text,
-        )
-
-        with_apostrophe_as_separator = re.sub(
-            r"[^\w\s]",
-            " ",
-            with_apostrophe_as_separator,
-        )
-
-        with_apostrophe_as_separator = re.sub(
-            r"\s+",
-            " ",
-            with_apostrophe_as_separator,
-        ).strip()
-
-        if with_apostrophe_as_separator:
-            variants.add(
-                with_apostrophe_as_separator
-            )
-
-        return variants
-
-    # =============================================================
+    # =========================================================
     # PREPARATION
-    # =============================================================
+    # =========================================================
 
     @staticmethod
-    def _prepare_user_lines(
+    def _prepare_original_user_lines(
         user_lyric: str,
     ) -> list[str]:
         return [
-            LyricMatcher._normalize(line)
+            line.strip()
             for line in user_lyric.splitlines()
             if line.strip()
         ]
-
-    # =============================================================
-    # NORMALIZATION
-    # =============================================================
-
-    @staticmethod
-    def _normalize(
-        text: str,
-    ) -> str:
-        """
-        Performs normalization without removing punctuation.
-
-        Examples:
-
-            "IT'S   THE   CLIMB"
-                ->
-            "it's the climb"
-
-            "It's THE climb!"
-                ->
-            "it's the climb!"
-        """
-
-        text = text.lower().strip()
-
-        text = LyricMatcher._normalize_apostrophes(
-            text
-        )
-
-        text = re.sub(
-            r"\s+",
-            " ",
-            text,
-        )
-
-        return text.strip()
-
-    @staticmethod
-    def _normalize_apostrophes(
-        text: str,
-    ) -> str:
-        """
-        Converts different apostrophe characters
-        into the standard ASCII apostrophe.
-        """
-
-        return (
-            text
-            .replace("’", "'")
-            .replace("‘", "'")
-            .replace("`", "'")
-        )

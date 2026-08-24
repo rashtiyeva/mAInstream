@@ -36,7 +36,15 @@ class LyricsNotFoundException(AppException):
 
 class LyricNotFoundException(AppException):
     """Raised when the user's lyric is not found in the song."""
-    
-    
+
+
+class LyricTooGenericException(AppException):
+    """Raised when the submitted lyric has too few meaningful words."""
+
+
+class ContinuationNotFoundException(AppException):
+    """Raised when a matched lyric has no valid continuation."""
+
+
 class InvalidProviderResponseException(ProviderException):
     """Raised when a provider returns an unexpected response."""

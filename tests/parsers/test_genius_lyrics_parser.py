@@ -1,5 +1,6 @@
 import pytest
 
+from app.core.exceptions import LyricsNotFoundException
 from app.parsers.genius_lyrics_parser import GeniusLyricsParser
 
 
@@ -64,7 +65,7 @@ def test_parse_raises_when_html_is_empty():
     parser = GeniusLyricsParser()
 
     with pytest.raises(
-        ValueError,
+        LyricsNotFoundException,
         match="Genius page HTML is empty.",
     ):
         parser.parse("")
@@ -82,7 +83,7 @@ def test_parse_raises_when_lyrics_are_not_found():
     parser = GeniusLyricsParser()
 
     with pytest.raises(
-        ValueError,
+        LyricsNotFoundException,
         match="Lyrics were not found on the Genius page.",
     ):
         parser.parse(html)
@@ -103,3 +104,33 @@ def test_parse_ignores_empty_lines():
     result = parser.parse(html)
 
     assert result == "First line\nSecond line"
+
+
+def test_parse_removes_genius_preamble_before_first_section_header():
+    html = """
+    <div data-lyrics-container="true">
+        Español<br/>
+        Português<br/>
+        A description of the song that is not part of its lyrics.<br/>
+        [Verse 1]<br/>
+        First lyric line<br/>
+        Second lyric line
+    </div>
+    """
+
+    result = GeniusLyricsParser().parse(html)
+
+    assert result == "First lyric line\nSecond lyric line"
+
+
+def test_parse_preserves_valid_headerless_lyrics():
+    html = """
+    <div data-lyrics-container="true">
+        First lyric line<br/>
+        Second lyric line
+    </div>
+    """
+
+    result = GeniusLyricsParser().parse(html)
+
+    assert result == "First lyric line\nSecond lyric line"
