@@ -1,3 +1,5 @@
+import pytest
+
 from app.services.lyric_matcher import LyricMatcher
 
 
@@ -335,13 +337,32 @@ def test_normalized_match_wins_before_fuzzy_candidate():
     assert result == 1
 
 
-def test_fuzzy_match_skips_short_ambiguous_input():
+@pytest.mark.parametrize("user_lyric", ["he", "me", "go", "love"])
+def test_fuzzy_match_skips_short_ambiguous_single_word(user_lyric: str):
     result = LyricMatcher().find_match(
-        lyrics=["Glove story", "Beloved by everyone"],
-        user_lyric="love",
+        lyrics=["The hero goes home", "Beloved by everyone"],
+        user_lyric=user_lyric,
     )
 
     assert result is None
+
+
+def test_fuzzy_match_allows_reasonably_long_single_word():
+    result = LyricMatcher().find_match(
+        lyrics=["Euphoria"],
+        user_lyric="euphoriaa",
+    )
+
+    assert result == 0
+
+
+def test_fuzzy_match_allows_two_word_input():
+    result = LyricMatcher().find_match(
+        lyrics=["Hello world"],
+        user_lyric="hello worlld",
+    )
+
+    assert result == 0
 
 
 def test_fuzzy_match_selects_highest_score_not_first_threshold_match():

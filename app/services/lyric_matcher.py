@@ -5,7 +5,7 @@ from rapidfuzz import fuzz
 
 from app.core.constants import (
     FUZZY_MATCH_THRESHOLD,
-    MIN_FUZZY_MATCH_WORDS,
+    MIN_FUZZY_SINGLE_WORD_CHARACTERS,
 )
 from app.services.lyric_input_validator import LyricInputValidator
 from app.services.lyric_normalizer import LyricNormalizer
@@ -440,20 +440,18 @@ class LyricMatcher:
             return None
 
         user_line = user_lines[0]
-        if (
-            LyricInputValidator.count_meaningful_words(user_line)
-            < MIN_FUZZY_MATCH_WORDS
+        aggressive_user = LyricNormalizer.aggressive(user_line)
+
+        if not LyricMatcher._is_fuzzy_input_eligible(
+            user_line=user_line,
+            aggressive_user=aggressive_user,
         ):
             logger.debug(
                 "LYRIC MATCH | fuzzy skipped | reason=input_too_short"
             )
             return None
 
-        aggressive_user = LyricNormalizer.aggressive(user_line)
         aggressive_lyrics = LyricNormalizer.aggressive_lines(lyrics)
-
-        if not aggressive_user:
-            return None
 
         best_index: int | None = None
         best_score = 0.0
@@ -485,6 +483,23 @@ class LyricMatcher:
             return None
 
         return best_index, best_score
+
+    @staticmethod
+    def _is_fuzzy_input_eligible(
+        user_line: str,
+        aggressive_user: str,
+    ) -> bool:
+        """Reject only short, ambiguous single-token fuzzy queries."""
+
+        word_count = LyricInputValidator.count_meaningful_words(user_line)
+
+        if word_count == 0:
+            return False
+
+        if word_count >= 2:
+            return True
+
+        return len(aggressive_user) >= MIN_FUZZY_SINGLE_WORD_CHARACTERS
 
     # =========================================================
     # PREPARATION

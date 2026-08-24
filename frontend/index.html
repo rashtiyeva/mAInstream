@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#100d18">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'none'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'"
+    >
+    <meta
+      name="description"
+      content="Start a song lyric and let mAInstream find what comes next."
+    >
+    <title>mAInstream — Finish the lyrics</title>
+    <link rel="stylesheet" href="./styles.css">
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
+
+    <main class="page-shell">
+      <section class="app-card" aria-labelledby="app-title">
+        <header class="app-header">
+          <p class="eyebrow">LYRIC CONTINUATION</p>
+          <h1 id="app-title">m<span class="brand-ai">AI</span>nstream</h1>
+          <p class="subtitle">You start it. I finish it.</p>
+        </header>
+
+        <form id="lyric-form" novalidate>
+          <div class="field-heading">
+            <label for="lyric-input">Your lyric fragment</label>
+            <output id="character-count" for="lyric-input">0 / 300</output>
+          </div>
+
+          <textarea
+            id="lyric-input"
+            name="lyric"
+            maxlength="300"
+            rows="5"
+            placeholder="Type a lyric fragment…"
+            autocomplete="off"
+            spellcheck="true"
+            aria-describedby="input-hint"
+          ></textarea>
+          <p id="input-hint" class="input-hint">
+            One line, a few words, or a whole verse — give it your best shot.
+          </p>
+
+          <button id="submit-button" type="submit">
+            <span class="button-label">Finish the lyrics</span>
+            <span class="button-glint" aria-hidden="true"></span>
+          </button>
+        </form>
+
+        <section
+          id="output-panel"
+          class="output-panel is-idle"
+          aria-live="polite"
+          aria-atomic="true"
+          aria-label="Lyric result and request status"
+        >
+          <div class="idle-content">
+            <span class="idle-mark" aria-hidden="true">♪</span>
+            <p>Your continuation will land here.</p>
+          </div>
+        </section>
+
+        <p class="keyboard-hint">
+          Tip: press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to submit.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
