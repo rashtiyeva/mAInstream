@@ -1,5 +1,6 @@
 
 import re
+from typing import ClassVar
 
 
 class LyricLineClassifier:
@@ -16,7 +17,7 @@ class LyricLineClassifier:
         "I remember you said yeah" -> False
     """
 
-    _VOCAL_WORDS = {
+    _VOCAL_WORDS: ClassVar[frozenset[str]] = frozenset({
         "ah",
         "aha",
         "ahh",
@@ -38,7 +39,7 @@ class LyricLineClassifier:
         "yeah",
         "yea",
         "yep",
-    }
+    })
 
     _SEPARATOR_PATTERN = re.compile(
         r"[\s\-–—,'’.!?…]+"

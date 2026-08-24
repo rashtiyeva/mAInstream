@@ -65,7 +65,8 @@ class GeniusLyricsParser:
     def parse(self, html: str) -> str:
         """Return newline-separated lyrics extracted from Genius HTML."""
 
-        logger.info("Parsing Genius lyrics page.")
+        logger.info("GENIUS PARSER | parse | started")
+        logger.debug("GENIUS PARSER | html_characters=%d", len(html or ""))
 
         if not html or not html.strip():
             raise LyricsNotFoundException("Genius page HTML is empty.")
@@ -73,7 +74,10 @@ class GeniusLyricsParser:
         soup = BeautifulSoup(html, "html.parser")
         containers = soup.select(self.LYRICS_CONTAINER_SELECTOR)
 
-        logger.debug("Found %d lyrics containers.", len(containers))
+        logger.debug(
+            "GENIUS PARSER | lyrics_containers=%d",
+            len(containers),
+        )
 
         if not containers:
             raise LyricsNotFoundException(
@@ -92,12 +96,12 @@ class GeniusLyricsParser:
         result = "\n".join(lyrics)
 
         logger.info(
-            "Successfully parsed Genius lyrics (%d lines, %d characters).",
+            "GENIUS PARSER | parse | completed | lines=%d | characters=%d",
             len(lyrics),
             len(result),
         )
         logger.debug(
-            "FULL CLEAN GENIUS LYRICS (%d lines):\n%s",
+            "GENIUS PARSER | full_clean_lyrics | lines=%d\n%s",
             len(lyrics),
             result,
         )
@@ -140,13 +144,13 @@ class GeniusLyricsParser:
 
             if cls._is_section_header(line):
                 logger.debug(
-                    "Removed %d pre-lyrics lines before first section header.",
+                    "GENIUS PARSER | preamble_removed | lines=%d",
                     index,
                 )
                 return raw_lines[index:]
 
         logger.debug(
-            "No section header found; preserving headerless lyrics content."
+            "GENIUS PARSER | headerless_content_preserved"
         )
         return raw_lines
 
@@ -156,26 +160,43 @@ class GeniusLyricsParser:
         raw_lines: Iterable[str],
     ) -> list[str]:
         cleaned_lines: list[str] = []
+        empty_lines = 0
+        section_headers = 0
+        metadata_lines = 0
+        embed_only_lines = 0
 
         for raw_line in raw_lines:
             line = cls._normalize_line(raw_line)
 
             if not line:
+                empty_lines += 1
                 continue
 
             if cls._is_section_header(line):
+                section_headers += 1
                 continue
 
             if cls._is_page_metadata(line):
+                metadata_lines += 1
                 continue
 
             line = cls.TRAILING_EMBED_PATTERN.sub("", line).strip()
 
             if not line:
+                embed_only_lines += 1
                 continue
 
             cleaned_lines.append(line)
 
+        logger.debug(
+            "GENIUS PARSER | cleaning_summary | kept=%d | empty=%d | "
+            "section_headers=%d | metadata=%d | embed_only=%d",
+            len(cleaned_lines),
+            empty_lines,
+            section_headers,
+            metadata_lines,
+            embed_only_lines,
+        )
         return cleaned_lines
 
     @classmethod

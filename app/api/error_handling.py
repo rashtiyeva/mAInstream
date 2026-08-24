@@ -122,14 +122,22 @@ def register_exception_handlers(app: FastAPI) -> None:
         exception: AppException,
     ) -> JSONResponse:
         error = translate_exception(exception)
-        log = logger.exception if error.status_code >= 500 else logger.warning
-        log(
-            "Handled application error for %s %s: %s",
-            request.method,
-            request.url.path,
-            exception,
-            exc_info=True,
-        )
+        if error.status_code >= 500:
+            logger.exception(
+                "HTTP ERROR | method=%s | path=%s | code=%s",
+                request.method,
+                request.url.path,
+                error.response.code,
+                exc_info=exception,
+            )
+        else:
+            logger.warning(
+                "HTTP ERROR | method=%s | path=%s | code=%s | detail=%s",
+                request.method,
+                request.url.path,
+                error.response.code,
+                exception,
+            )
         return JSONResponse(
             status_code=error.status_code,
             content=error.response.model_dump(mode="json"),
@@ -142,7 +150,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     ) -> JSONResponse:
         error = translate_exception(exception)
         logger.exception(
-            "Unexpected error for %s %s",
+            "HTTP ERROR | unexpected | method=%s | path=%s",
             request.method,
             request.url.path,
             exc_info=exception,

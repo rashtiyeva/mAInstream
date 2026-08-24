@@ -1,5 +1,9 @@
+import logging
+
 from app.core.constants import MIN_LYRIC_WORDS
 from app.services.lyric_normalizer import LyricNormalizer
+
+logger = logging.getLogger(__name__)
 
 
 class LyricInputValidator:
@@ -12,7 +16,16 @@ class LyricInputValidator:
         self._min_words = min_words
 
     def is_too_generic(self, lyric: str) -> bool:
-        return self.count_meaningful_words(lyric) < self._min_words
+        word_count = self.count_meaningful_words(lyric)
+        is_too_generic = word_count < self._min_words
+        logger.debug(
+            "INPUT VALIDATION | meaningful_words=%d | minimum=%d | "
+            "too_generic=%s",
+            word_count,
+            self._min_words,
+            is_too_generic,
+        )
+        return is_too_generic
 
     @staticmethod
     def count_meaningful_words(lyric: str) -> int:

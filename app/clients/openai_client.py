@@ -29,6 +29,8 @@ class OpenAIClient:
     async def identify_song(self, lyric: str) -> Song:
 
         try:
+            logger.info("OPENAI | identify_song | started | model=%s", self._model)
+            logger.debug("OPENAI | identify_song | user_input=%r", lyric)
             response = await self._client.responses.create(
                 model=self._model,
                 input=[
@@ -43,7 +45,10 @@ class OpenAIClient:
                 ],
             )
 
-            logger.debug("OpenAI raw response: %s", response.output_text)
+            logger.debug(
+                "OPENAI | identify_song | raw_response=%r",
+                response.output_text,
+            )
 
             if not response.output_text:
                 raise InvalidProviderResponseException(
@@ -52,7 +57,11 @@ class OpenAIClient:
 
             song = Song.model_validate_json(response.output_text)
 
-            logger.debug("Parsed song response: %s", song)
+            logger.info(
+                "OPENAI | identify_song | completed | song=%r | artist=%r",
+                song.title,
+                song.artist,
+            )
 
             return song
 
@@ -65,3 +74,8 @@ class OpenAIClient:
             raise OpenAIException(
                 "Failed to communicate with OpenAI."
             ) from ex
+
+    async def close(self) -> None:
+        logger.debug("OPENAI | client_close | started")
+        await self._client.close()
+        logger.debug("OPENAI | client_close | completed")

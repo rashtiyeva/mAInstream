@@ -36,6 +36,7 @@ async def identify_song(
         Depends(get_lyrics_orchestrator),
     ],
 ) -> LyricContinuationResponse:
+    logger.info("HTTP | POST /lyrics/identify | started")
     return await orchestrator.get_continuation(request.lyric)
 
 
@@ -58,6 +59,7 @@ async def identify_song_stream(
 ) -> StreamingResponse:
     async def event_stream() -> AsyncIterator[str]:
         reporter = QueueProgressReporter()
+        logger.info("SSE | POST /lyrics/identify/stream | opened")
 
         async def run_workflow() -> None:
             try:
@@ -68,6 +70,7 @@ async def identify_song_stream(
                 await reporter.events.put(
                     ("result", result.model_dump_json())
                 )
+                logger.info("SSE | terminal_event_queued | event=result")
             except Exception as exception:
                 error = translate_exception(exception)
                 if error.status_code >= 500:
@@ -85,20 +88,27 @@ async def identify_song_stream(
                 await reporter.events.put(
                     ("error", error.response.model_dump_json())
                 )
+                logger.info(
+                    "SSE | terminal_event_queued | event=error | code=%s",
+                    error.response.code,
+                )
 
         task = asyncio.create_task(run_workflow())
 
         try:
             while True:
                 event_name, data_json = await reporter.events.get()
+                logger.debug("SSE | emitting | event=%s", event_name)
                 yield encode_sse(event_name, data_json)
 
                 if event_name in {"result", "error"}:
                     break
         finally:
             if not task.done():
+                logger.debug("SSE | cancelling_workflow")
                 task.cancel()
             await asyncio.gather(task, return_exceptions=True)
+            logger.info("SSE | stream_closed")
 
     return StreamingResponse(
         event_stream(),

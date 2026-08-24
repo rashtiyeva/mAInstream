@@ -1,7 +1,7 @@
 import logging
 import re
 import unicodedata
-
+from typing import ClassVar
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ class LyricNormalizer:
     Punctuation is intentionally preserved.
     """
 
-    _APOSTROPHES = {
+    _APOSTROPHES: ClassVar[dict[str, str]] = {
         "’": "'",
         "‘": "'",
         "`": "'",

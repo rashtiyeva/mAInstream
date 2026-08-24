@@ -1,3 +1,5 @@
+import logging
+
 from pydantic import ValidationError
 
 from app.clients.genius_client import GeniusClient
@@ -6,6 +8,9 @@ from app.models.domain.song import Song
 from app.models.domain.song_source import SongSource
 from app.models.dto.genius_search_response import GeniusSearchResponse
 from app.providers.base_provider import BaseProvider
+
+
+logger = logging.getLogger(__name__)
 
 
 class GeniusProvider(BaseProvider):
@@ -18,6 +23,11 @@ class GeniusProvider(BaseProvider):
         song: Song,
     ) -> SongSource | None:
         query = f"{song.title} {song.artist}"
+        logger.info(
+            "GENIUS PROVIDER | find_song | started | song=%r | artist=%r",
+            song.title,
+            song.artist,
+        )
 
         response = await self._client.search(query)
 
@@ -30,19 +40,36 @@ class GeniusProvider(BaseProvider):
                 "Genius returned an invalid response."
             ) from ex
 
-        for hit in data.response.hits:
+        logger.debug(
+            "GENIUS PROVIDER | search_results=%d",
+            len(data.response.hits),
+        )
+
+        for index, hit in enumerate(data.response.hits):
             result = hit.result
+            logger.debug(
+                "GENIUS PROVIDER | candidate | index=%d | title=%r | "
+                "artist=%r",
+                index,
+                result.title,
+                result.primary_artist.name,
+            )
 
             if self._matches_song(
                 song=song,
                 title=result.title,
                 artist=result.primary_artist.name,
             ):
+                logger.info(
+                    "GENIUS PROVIDER | find_song | matched | index=%d",
+                    index,
+                )
                 return SongSource(
                     song=song,
                     url=result.url,
                 )
 
+        logger.info("GENIUS PROVIDER | find_song | no_match")
         return None
 
     @staticmethod

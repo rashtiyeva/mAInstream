@@ -46,13 +46,18 @@ class LyricsOrchestrator:
         progress_reporter: ProgressReporter | None = None,
     ) -> LyricContinuationResponse:
         reporter = progress_reporter or NoOpProgressReporter()
-        logger.info("Starting lyric continuation.")
+        logger.info("PIPELINE | started")
+        logger.debug("PIPELINE | user_input=%r", lyric)
 
         await reporter.report(
             ProgressEvent(step=ProgressStep.VALIDATING_INPUT)
         )
         input_is_too_generic = (
             self._lyric_input_validator.is_too_generic(lyric)
+        )
+        logger.debug(
+            "PIPELINE | input_classified | too_generic=%s",
+            input_is_too_generic,
         )
 
         await reporter.report(
@@ -62,6 +67,10 @@ class LyricsOrchestrator:
             song = await self._song_identifier_service.identify_song(lyric)
         except SongNotFoundException as exception:
             if input_is_too_generic:
+                logger.info(
+                    "PIPELINE | song_not_identified | "
+                    "classification=too_generic"
+                )
                 raise LyricTooGenericException(
                     "The provided lyric is too short to identify reliably."
                 ) from exception
@@ -69,7 +78,7 @@ class LyricsOrchestrator:
             raise
 
         logger.info(
-            "Song identified: %s - %s",
+            "PIPELINE | song_identified | song=%r | artist=%r",
             song.title,
             song.artist,
         )
@@ -90,7 +99,7 @@ class LyricsOrchestrator:
             song,
         )
 
-        logger.info("Lyrics source found.")
+        logger.info("PIPELINE | lyrics_source_found | url=%s", source.url)
 
         await reporter.report(
             ProgressEvent(step=ProgressStep.LYRICS_SOURCE_FOUND)
@@ -102,7 +111,11 @@ class LyricsOrchestrator:
 
         page = await self._genius_client.get_page(source.url)
 
-        logger.info("Genius page retrieved.")
+        logger.info(
+            "PIPELINE | lyrics_page_fetched | status=%s | characters=%d",
+            page.status_code,
+            len(page.text),
+        )
 
         await reporter.report(
             ProgressEvent(step=ProgressStep.PARSING_LYRICS)
@@ -110,7 +123,17 @@ class LyricsOrchestrator:
 
         lyrics = self._lyrics_parser.parse(page.text)
 
-        logger.info("Genius lyrics parsed successfully.")
+        if isinstance(lyrics, str):
+            logger.info(
+                "PIPELINE | lyrics_parsed | lines=%d | characters=%d",
+                len(lyrics.splitlines()),
+                len(lyrics),
+            )
+        else:
+            logger.debug(
+                "PIPELINE | lyrics_parsed | metrics_unavailable | type=%s",
+                type(lyrics).__name__,
+            )
 
         await reporter.report(
             ProgressEvent(step=ProgressStep.MATCHING_LYRIC)
@@ -122,7 +145,8 @@ class LyricsOrchestrator:
             song_title=song.title,
         )
 
-        logger.info("Lyric continuation found.")
+        logger.info("PIPELINE | continuation_found")
+        logger.debug("PIPELINE | continuation=%r", continuation)
 
         await reporter.report(
             ProgressEvent(step=ProgressStep.CONTINUATION_FOUND)

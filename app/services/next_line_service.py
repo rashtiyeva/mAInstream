@@ -8,7 +8,6 @@ from app.services.lyric_line_classifier import LyricLineClassifier
 from app.services.lyric_matcher import LyricMatcher
 from app.services.lyric_normalizer import LyricNormalizer
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -38,6 +37,13 @@ class NextLineService:
         song_title: str | None = None,
     ) -> str:
         lyric_lines = self._prepare_lyric_lines(lyrics)
+        logger.debug(
+            "NEXT LINE | started | lyric_lines=%d | song_title=%r | "
+            "user_input=%r",
+            len(lyric_lines),
+            song_title,
+            user_lyric,
+        )
 
         if not user_lyric or not user_lyric.strip():
             raise LyricNotFoundException("Lyric input is empty.")
@@ -58,9 +64,9 @@ class NextLineService:
                 raise LyricNotFoundException("Song lyrics are empty.")
 
             logger.info(
-                "NEXT LINE | user input matched song title; "
-                "returning first lyric line"
+                "NEXT LINE | completed | strategy=song_title | index=0"
             )
+            logger.debug("NEXT LINE | continuation=%r", first_line)
             return first_line
 
         logger.debug(
@@ -76,6 +82,7 @@ class NextLineService:
         )
 
         if match_end is None:
+            logger.info("NEXT LINE | lyric_match_not_found")
             raise LyricNotFoundException(
                 "Unable to find the provided lyric "
                 "in the song."
@@ -86,6 +93,11 @@ class NextLineService:
             for line in user_lyric.splitlines()
             if line.strip()
         ]
+        logger.debug(
+            "NEXT LINE | lyric_matched | end_index=%d | user_lines=%d",
+            match_end,
+            len(user_lines),
+        )
 
         if len(user_lines) == 1:
             matched_line = lyric_lines[match_end]
@@ -110,14 +122,19 @@ class NextLineService:
                     )
 
                     logger.info(
-                        "NEXT LINE | returning partial-line remainder "
-                        "and next line"
+                        "NEXT LINE | completed | strategy=partial_remainder | "
+                        "matched_index=%d | has_next_line=%s",
+                        match_end,
+                        next_line is not None,
                     )
 
                     if next_line is None:
+                        logger.debug("NEXT LINE | continuation=%r", remainder)
                         return remainder
 
-                    return f"{remainder}...\n\n{next_line}"
+                    continuation = f"{remainder}...\n\n{next_line}"
+                    logger.debug("NEXT LINE | continuation=%r", continuation)
+                    return continuation
 
         line = self._find_next_meaningful_line(
             lyric_lines=lyric_lines,
@@ -125,8 +142,18 @@ class NextLineService:
         )
 
         if line is not None:
+            logger.info(
+                "NEXT LINE | completed | strategy=next_meaningful_line | "
+                "matched_index=%d",
+                match_end,
+            )
+            logger.debug("NEXT LINE | continuation=%r", line)
             return line
 
+        logger.info(
+            "NEXT LINE | continuation_not_found | matched_index=%d",
+            match_end,
+        )
         raise ContinuationNotFoundException(
             "There is no next line for the provided lyric."
         )
@@ -136,9 +163,28 @@ class NextLineService:
         lyric_lines: list[str],
         start_index: int,
     ) -> str | None:
-        for line in lyric_lines[start_index:]:
+        skipped_vocal_lines = 0
+
+        for index, line in enumerate(
+            lyric_lines[start_index:],
+            start=start_index,
+        ):
             if not self._lyric_line_classifier.is_vocal_only(line):
+                logger.debug(
+                    "NEXT LINE | meaningful_line_found | index=%d | "
+                    "skipped_vocal_lines=%d",
+                    index,
+                    skipped_vocal_lines,
+                )
                 return line
+
+            skipped_vocal_lines += 1
+
+        logger.debug(
+            "NEXT LINE | meaningful_line_not_found | "
+            "skipped_vocal_lines=%d",
+            skipped_vocal_lines,
+        )
 
         return None
 

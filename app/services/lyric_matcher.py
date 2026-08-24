@@ -10,7 +10,6 @@ from app.core.constants import (
 from app.services.lyric_input_validator import LyricInputValidator
 from app.services.lyric_normalizer import LyricNormalizer
 
-
 logger = logging.getLogger(__name__)
 
 
