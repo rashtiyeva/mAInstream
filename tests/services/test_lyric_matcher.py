@@ -84,7 +84,7 @@ def test_aggressive_match_ignores_missing_apostrophe():
     assert result == 0
 
 
-def test_does_not_join_split_contraction_yet():
+def test_fuzzy_match_handles_split_contraction():
     matcher = LyricMatcher()
 
     lyrics = [
@@ -96,7 +96,7 @@ def test_does_not_join_split_contraction_yet():
         user_lyric="it s the climb",
     )
 
-    assert result is None
+    assert result == 0
 
 
 def test_multi_line_exact_match():
@@ -276,6 +276,90 @@ def test_aggressive_partial_match_does_not_match_inside_word():
     result = matcher.find_match(
         lyrics=["The players gonna play"],
         user_lyric="'he'",
+    )
+
+    assert result is None
+
+
+def test_fuzzy_match_handles_extra_letter_typo():
+    result = LyricMatcher().find_match(
+        lyrics=["It's the climb"],
+        user_lyric="itss the climb",
+    )
+
+    assert result == 0
+
+
+def test_fuzzy_match_handles_typo_in_partial_line():
+    result = LyricMatcher().find_match(
+        lyrics=["I remember it all too well"],
+        user_lyric="i remmber it all too",
+    )
+
+    assert result == 0
+
+
+def test_fuzzy_match_handles_typo_with_repeated_line_suffix():
+    result = LyricMatcher().find_match(
+        lyrics=["'Cause the players gonna play, play, play, play, play"],
+        user_lyric="cause the playrs gonna play",
+    )
+
+    assert result == 0
+
+
+def test_fuzzy_match_rejects_unrelated_text():
+    result = LyricMatcher().find_match(
+        lyrics=["It's the climb"],
+        user_lyric="completely unrelated words",
+    )
+
+    assert result is None
+
+
+def test_exact_match_wins_before_fuzzy_candidate():
+    result = LyricMatcher().find_match(
+        lyrics=["Itss the climb", "It's the climb"],
+        user_lyric="It's the climb",
+    )
+
+    assert result == 1
+
+
+def test_normalized_match_wins_before_fuzzy_candidate():
+    result = LyricMatcher().find_match(
+        lyrics=["Itss the climb", "It's the climb"],
+        user_lyric="IT'S THE CLIMB",
+    )
+
+    assert result == 1
+
+
+def test_fuzzy_match_skips_short_ambiguous_input():
+    result = LyricMatcher().find_match(
+        lyrics=["Glove story", "Beloved by everyone"],
+        user_lyric="love",
+    )
+
+    assert result is None
+
+
+def test_fuzzy_match_selects_highest_score_not_first_threshold_match():
+    result = LyricMatcher().find_match(
+        lyrics=[
+            "I remember it all two",
+            "I remember it all too well",
+        ],
+        user_lyric="i remmber it all too",
+    )
+
+    assert result == 1
+
+
+def test_fuzzy_match_does_not_support_multi_line_input():
+    result = LyricMatcher().find_match(
+        lyrics=["It is the climb", "Keep moving forward"],
+        user_lyric="itss the climb\nkeep movng forward",
     )
 
     assert result is None

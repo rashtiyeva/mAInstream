@@ -1,6 +1,13 @@
 import logging
 import re
 
+from rapidfuzz import fuzz
+
+from app.core.constants import (
+    FUZZY_MATCH_THRESHOLD,
+    MIN_FUZZY_MATCH_WORDS,
+)
+from app.services.lyric_input_validator import LyricInputValidator
 from app.services.lyric_normalizer import LyricNormalizer
 
 
@@ -18,6 +25,7 @@ class LyricMatcher:
     2. Normalized match.
     3. Normalized partial-line match at word boundaries.
     4. Aggressively normalized partial-line match at word boundaries.
+    5. Fuzzy typo-tolerant match for sufficiently long single-line input.
 
     More tolerant matching strategies will be
     added later as fallbacks.
@@ -121,10 +129,25 @@ class LyricMatcher:
             )
             return aggressive_partial_match
 
+        fuzzy_match = self._find_fuzzy_match(
+            lyrics=lyrics,
+            user_lines=user_lines,
+        )
+
+        if fuzzy_match is not None:
+            fuzzy_index, fuzzy_score = fuzzy_match
+            logger.info(
+                "LYRIC MATCH | found=true | strategy=fuzzy | "
+                "score=%.1f | index=%d",
+                fuzzy_score,
+                fuzzy_index,
+            )
+            return fuzzy_index
+
         logger.info(
             "LYRIC MATCH | found=false | "
             "strategies=exact,normalized,normalized_partial,"
-            "aggressive_normalized_partial"
+            "aggressive_normalized_partial,fuzzy"
         )
         return None
 
@@ -402,6 +425,67 @@ class LyricMatcher:
                 return start
 
         return None
+
+    # =========================================================
+    # FUZZY MATCH
+    # =========================================================
+
+    @staticmethod
+    def _find_fuzzy_match(
+        lyrics: list[str],
+        user_lines: list[str],
+    ) -> tuple[int, float] | None:
+        """Return the highest-scoring typo-tolerant single-line match."""
+
+        if len(user_lines) != 1:
+            return None
+
+        user_line = user_lines[0]
+        if (
+            LyricInputValidator.count_meaningful_words(user_line)
+            < MIN_FUZZY_MATCH_WORDS
+        ):
+            logger.debug(
+                "LYRIC MATCH | fuzzy skipped | reason=input_too_short"
+            )
+            return None
+
+        aggressive_user = LyricNormalizer.aggressive(user_line)
+        aggressive_lyrics = LyricNormalizer.aggressive_lines(lyrics)
+
+        if not aggressive_user:
+            return None
+
+        best_index: int | None = None
+        best_score = 0.0
+        second_best_score = 0.0
+
+        for index, lyric_line in enumerate(aggressive_lyrics):
+            if not lyric_line:
+                continue
+
+            score = float(
+                fuzz.partial_ratio(aggressive_user, lyric_line)
+            )
+
+            if score > best_score:
+                second_best_score = best_score
+                best_score = score
+                best_index = index
+            elif score > second_best_score:
+                second_best_score = score
+
+        logger.debug(
+            "LYRIC MATCH | fuzzy candidates evaluated | "
+            "best_score=%.1f | second_best_score=%.1f",
+            best_score,
+            second_best_score,
+        )
+
+        if best_index is None or best_score < FUZZY_MATCH_THRESHOLD:
+            return None
+
+        return best_index, best_score
 
     # =========================================================
     # PREPARATION
