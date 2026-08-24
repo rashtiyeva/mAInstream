@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -86,3 +88,31 @@ def test_invalid_request_uses_stable_error_contract() -> None:
         "code": "INVALID_REQUEST",
         "message": "The request payload is invalid.",
     }
+
+
+def test_expected_domain_error_logs_without_traceback(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    app = FastAPI()
+    register_exception_handlers(app)
+
+    @app.get("/fail")
+    async def fail() -> None:
+        raise LyricNotFoundException("diagnostic detail")
+
+    with caplog.at_level(logging.WARNING, logger="app.api.error_handling"):
+        response = TestClient(
+            app,
+            raise_server_exceptions=False,
+        ).get("/fail")
+
+    records = [
+        record
+        for record in caplog.records
+        if record.name == "app.api.error_handling"
+        and "LYRIC_NOT_FOUND" in record.getMessage()
+    ]
+
+    assert response.status_code == 422
+    assert len(records) == 1
+    assert records[0].exc_info is None
