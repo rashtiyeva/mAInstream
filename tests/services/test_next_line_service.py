@@ -112,14 +112,15 @@ def test_aggressive_partial_match_preserves_original_remainder(
         "SHAKE IT OFF",
     ],
 )
-def test_song_title_returns_first_lyric_line(
+def test_song_title_text_is_matched_as_a_real_lyric_fragment(
     service: NextLineService,
     user_input: str,
 ) -> None:
     lyrics = (
         "I stay out too late\n"
         "Got nothin' in my brain\n"
-        "I shake it off, I shake it off"
+        "I shake it off, I shake it off\n"
+        "Heartbreakers gonna break"
     )
 
     result = service.find_next_line(
@@ -128,7 +129,25 @@ def test_song_title_returns_first_lyric_line(
         song_title="Shake It Off",
     )
 
-    assert result == "I stay out too late"
+    assert result == "I shake it off...\n\nHeartbreakers gonna break"
+
+
+def test_song_title_that_is_opening_lyric_returns_following_line(
+    service: NextLineService,
+) -> None:
+    lyrics = (
+        "Yesterday\n"
+        "All my troubles seemed so far away\n"
+        "Now it looks as though they're here to stay"
+    )
+
+    result = service.find_next_line(
+        lyrics=lyrics,
+        user_lyric="Yesterday",
+        song_title="Yesterday",
+    )
+
+    assert result == "All my troubles seemed so far away"
 
 
 def test_find_next_line_raises_when_lyric_is_not_found(

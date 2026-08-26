@@ -51,24 +51,6 @@ class NextLineService:
         if not lyric_lines:
             raise LyricNotFoundException("Song lyrics are empty.")
 
-        if self._is_song_title(
-            user_lyric=user_lyric,
-            song_title=song_title,
-        ):
-            first_line = self._find_next_meaningful_line(
-                lyric_lines=lyric_lines,
-                start_index=0,
-            )
-
-            if first_line is None:
-                raise LyricNotFoundException("Song lyrics are empty.")
-
-            logger.info(
-                "NEXT LINE | completed | strategy=song_title | index=0"
-            )
-            logger.debug("NEXT LINE | continuation=%r", first_line)
-            return first_line
-
         logger.debug(
             "NEXT LINE | matching user lyric against %d parsed lines",
             len(lyric_lines),
@@ -163,6 +145,17 @@ class NextLineService:
         lyric_lines: list[str],
         start_index: int,
     ) -> str | None:
+        match = self._find_next_meaningful_line_with_index(
+            lyric_lines=lyric_lines,
+            start_index=start_index,
+        )
+        return match[1] if match is not None else None
+
+    def _find_next_meaningful_line_with_index(
+        self,
+        lyric_lines: list[str],
+        start_index: int,
+    ) -> tuple[int, str] | None:
         skipped_vocal_lines = 0
 
         for index, line in enumerate(
@@ -176,7 +169,7 @@ class NextLineService:
                     index,
                     skipped_vocal_lines,
                 )
-                return line
+                return index, line
 
             skipped_vocal_lines += 1
 
@@ -187,19 +180,6 @@ class NextLineService:
         )
 
         return None
-
-    @staticmethod
-    def _is_song_title(
-        user_lyric: str,
-        song_title: str | None,
-    ) -> bool:
-        if not song_title or not song_title.strip():
-            return False
-
-        return (
-            LyricNormalizer.aggressive(user_lyric)
-            == LyricNormalizer.aggressive(song_title)
-        )
 
     @staticmethod
     def _prepare_lyric_lines(
