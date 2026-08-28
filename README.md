@@ -28,11 +28,11 @@ The LLM is responsible for **song identification only**. Lyric retrieval, parsin
 
 
 
-https://github.com/user-attachments/assets/07e456ea-5e1a-4a04-b673-8d74bcc1bc2c
 
 
+https://github.com/user-attachments/assets/39f5ef4c-5d22-4ad1-8e6d-b8181ed5cbd5
 
-https://github.com/user-attachments/assets/e319d229-d152-4768-8e79-1067a36256f7
+
 
 
 
