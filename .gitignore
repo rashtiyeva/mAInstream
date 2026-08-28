@@ -25,3 +25,11 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Ruff
+.ruff_cache/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
