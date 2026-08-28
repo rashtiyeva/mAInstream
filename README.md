@@ -366,3 +366,6 @@ SSE exposes those stages to the frontend over the existing HTTP request without 
 
 ---
 
+## Author
+
+[Shafiga Rashtiyeva](https://www.linkedin.com/in/shafiga-rashtiyeva-0aa427281)
