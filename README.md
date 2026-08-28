@@ -26,13 +26,15 @@ The LLM is responsible for **song identification only**. Lyric retrieval, parsin
 
 <div align="center">
 
-<!-- Replace this block with your demo video/GIF -->
 
-**Demo coming here**
 
-<!-- Example:
-https://github.com/user-attachments/assets/YOUR_VIDEO_ID
--->
+https://github.com/user-attachments/assets/07e456ea-5e1a-4a04-b673-8d74bcc1bc2c
+
+
+
+https://github.com/user-attachments/assets/e319d229-d152-4768-8e79-1067a36256f7
+
+
 
 </div>
 
